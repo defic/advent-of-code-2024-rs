@@ -1,27 +1,43 @@
-use std::io::{self, BufRead};
+use std::{
+    env,
+    io::{self, BufRead},
+};
 
 fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+    match args.first() {
+        Some(val) if val == "1" => part1(),
+        Some(val) if val == "2" => part2(),
+        Some(_) => eprintln!("Invalid argument. Only 1 or 2 are accepted"),
+        None => eprintln!("Provide argument 1 or 2"),
+    }
+}
+
+fn input_to_integer_vecs(input_lines: Vec<String>) -> (Vec<i32>, Vec<i32>) {
+    input_lines
+        .iter()
+        .map(|line| {
+            let mut elements = line.split_ascii_whitespace();
+            let left = elements.next().unwrap().parse::<i32>().unwrap();
+            let right = elements.next().unwrap().parse::<i32>().unwrap();
+            (left, right)
+        })
+        .unzip()
+}
+
+fn get_input() -> Vec<String> {
     let stdin = io::stdin();
     let input_lines: Vec<String> = stdin
         .lock()
         .lines()
         .map(|line| line.expect("Failed to read line"))
         .collect();
+    input_lines
+}
 
-    let input: Vec<_> = input_lines
-        .iter()
-        .map(|line| {
-            let mut elements = line.split_ascii_whitespace();
-            (elements.next().unwrap(), elements.next().unwrap())
-        })
-        .collect();
-    let mut left = Vec::new();
-    let mut right = Vec::new();
-
-    input.into_iter().for_each(|tuple| {
-        left.push(tuple.0.parse::<i32>().unwrap());
-        right.push(tuple.1.parse::<i32>().unwrap());
-    });
+fn part1() {
+    let input_lines = get_input();
+    let (mut left, mut right) = input_to_integer_vecs(input_lines);
 
     left.sort();
     right.sort();
@@ -31,4 +47,8 @@ fn main() {
         .zip(right)
         .fold(0, |acc, tuple| acc + (tuple.0 - tuple.1).abs());
     println!("res: {}", res)
+}
+
+fn part2() {
+    todo!()
 }
