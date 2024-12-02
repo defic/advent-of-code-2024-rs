@@ -26,9 +26,6 @@ fn main() {
     left.sort();
     right.sort();
 
-    dbg!(&left);
-    dbg!(&right);
-
     let res = left
         .into_iter()
         .zip(right)
