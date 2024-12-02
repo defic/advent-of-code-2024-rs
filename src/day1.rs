@@ -50,5 +50,18 @@ fn part1() {
 }
 
 fn part2() {
-    todo!()
+    let input_lines = get_input();
+    let (left, right) = input_to_integer_vecs(input_lines);
+
+    let similarity_score = left.iter().fold(0, |total, elem| {
+        total + elem * find_occurances(elem, &right)
+    });
+    println!("similarity_score: {}", similarity_score)
+}
+
+fn find_occurances(number: &i32, list: &[i32]) -> i32 {
+    list.iter().fold(
+        0,
+        |count, item| if number == item { count + 1 } else { count },
+    )
 }
