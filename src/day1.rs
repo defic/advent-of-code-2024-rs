@@ -3,14 +3,10 @@ use std::{
     io::{self, BufRead},
 };
 
+use advent_of_code_2024::{get_input, task_argument};
+
 fn main() {
-    let args: Vec<String> = env::args().skip(1).collect();
-    match args.first() {
-        Some(val) if val == "1" => part1(),
-        Some(val) if val == "2" => part2(),
-        Some(_) => eprintln!("Invalid argument. Only 1 or 2 are accepted"),
-        None => eprintln!("Provide argument 1 or 2"),
-    }
+    task_argument(part1, part2);
 }
 
 fn input_to_integer_vecs(input_lines: Vec<String>) -> (Vec<i32>, Vec<i32>) {
@@ -23,16 +19,6 @@ fn input_to_integer_vecs(input_lines: Vec<String>) -> (Vec<i32>, Vec<i32>) {
             (left, right)
         })
         .unzip()
-}
-
-fn get_input() -> Vec<String> {
-    let stdin = io::stdin();
-    let input_lines: Vec<String> = stdin
-        .lock()
-        .lines()
-        .map(|line| line.expect("Failed to read line"))
-        .collect();
-    input_lines
 }
 
 fn part1() {
