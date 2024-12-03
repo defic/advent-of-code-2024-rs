@@ -54,14 +54,12 @@ fn part2() {
     let (left, right) = input_to_integer_vecs(input_lines);
 
     let similarity_score = left.iter().fold(0, |total, elem| {
-        total + elem * find_occurances(elem, &right)
+        total
+            + elem
+                * right
+                    .iter()
+                    .filter(|right_elem| elem == *right_elem)
+                    .count() as i32
     });
     println!("similarity_score: {}", similarity_score)
-}
-
-fn find_occurances(number: &i32, list: &[i32]) -> i32 {
-    list.iter().fold(
-        0,
-        |count, item| if number == item { count + 1 } else { count },
-    )
 }
