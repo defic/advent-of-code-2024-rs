@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash, process::exit};
+use std::{collections::HashSet, hash::Hash, process::exit, time::Instant};
 
 use advent_of_code_2024::task_argument;
 use nom::InputIter;
@@ -40,15 +40,18 @@ fn solve1(input: Vec<&str>) -> usize {
 
     let height = walls.len();
     let width = walls.first().unwrap().len();
-    let mut direction = Direction::Up;
     let mut tracks = vec![vec![false; width]; height];
-
+    let mut direction = Direction::Up;
     loop {
-        let Ok(pos) = next_stop(guard, &direction, &walls, &mut tracks) else {
+        let mut steps_to_obstacle = Vec::new();
+        let Ok(pos) = next_stop(guard, &direction, &walls, &mut steps_to_obstacle) else {
             break;
         };
         guard = pos;
         direction = direction.next();
+        steps_to_obstacle.iter().for_each(|step| {
+            tracks[step.0 as usize][step.1 as usize] = true;
+        });
     }
 
     tracks.into_iter().flatten().filter(|x| *x).count()
@@ -58,34 +61,9 @@ fn next_stop(
     mut guard: (i32, i32),
     direction: &Direction,
     walls: &Vec<Vec<bool>>,
-    tracks: &mut Vec<Vec<bool>>,
-) -> Result<(i32, i32), (i32, i32)> {
-    loop {
-        tracks[guard.0 as usize][guard.1 as usize] = true;
-        let next_step = (
-            guard.0 + direction.vector().0,
-            guard.1 + direction.vector().1,
-        );
-
-        if out_of_bounds(next_step, walls) {
-            return Err(guard);
-        }
-        if is_wall(next_step, walls) {
-            return Ok(guard);
-        }
-        guard = next_step;
-    }
-}
-
-fn next_stop2(
-    mut guard: (i32, i32),
-    direction: &Direction,
-    walls: &Vec<Vec<bool>>,
     steps: &mut Vec<(i32, i32)>,
-    tracks: &mut Vec<Vec<bool>>,
 ) -> Result<(i32, i32), (i32, i32)> {
     loop {
-        tracks[guard.0 as usize][guard.1 as usize] = true;
         let next_step = (
             guard.0 + direction.vector().0,
             guard.1 + direction.vector().1,
@@ -142,10 +120,11 @@ impl Direction {
 }
 
 fn task2() {
+    let time = Instant::now();
     let input = std::fs::read_to_string("inputs/day6.txt").unwrap();
     let input: Vec<_> = input.lines().collect();
     let res = solve2(input);
-    println!("res: {}", res);
+    println!("res: {}, elapsed: {:?}", res, time.elapsed());
 }
 
 fn solve2(input: Vec<&str>) -> usize {
@@ -163,20 +142,14 @@ fn solve2(input: Vec<&str>) -> usize {
     let width = walls.first().unwrap().len();
     let mut direction = Direction::Up;
 
-    let mut wall_options = HashSet::new();
+    let mut wall_options = Vec::new();
     let mut tracks = vec![vec![false; width]; height];
+    let mut wall_clone = walls.clone(); //
 
     loop {
         let mut exiting = false;
         let mut steps_to_obstacle = Vec::new();
-        let mut new_tracks = vec![vec![false; width]; height];
-        let pos: (i32, i32) = match next_stop2(
-            guard,
-            &direction,
-            &walls,
-            &mut steps_to_obstacle,
-            &mut new_tracks,
-        ) {
+        let pos: (i32, i32) = match next_stop(guard, &direction, &walls, &mut steps_to_obstacle) {
             Ok(pos) => pos,
             Err(pos) => {
                 exiting = true;
@@ -184,15 +157,15 @@ fn solve2(input: Vec<&str>) -> usize {
             }
         };
 
-        for obstacle in steps_to_obstacle {
+        for obstacle in steps_to_obstacle.iter() {
             if tracks[obstacle.0 as usize][obstacle.1 as usize] {
                 continue;
             }
-            let mut added_wall = walls.clone();
-            added_wall[obstacle.0 as usize][obstacle.1 as usize] = true;
-            if !can_exit(guard, direction.clone(), &added_wall) {
-                wall_options.insert(obstacle);
+            wall_clone[obstacle.0 as usize][obstacle.1 as usize] = true;
+            if !can_exit(guard, direction.clone(), &wall_clone) {
+                wall_options.push(*obstacle);
             }
+            wall_clone[obstacle.0 as usize][obstacle.1 as usize] = false;
         }
 
         if exiting {
@@ -201,24 +174,20 @@ fn solve2(input: Vec<&str>) -> usize {
 
         guard = pos;
         direction = direction.next();
-        tracks //combining new tracks with old
-            .iter_mut()
-            .zip(new_tracks.iter())
-            .for_each(|(row1, row2)| {
-                row1.iter_mut().zip(row2.iter()).for_each(|(a, &b)| *a |= b);
-            });
+
+        steps_to_obstacle.iter().for_each(|step| {
+            tracks[step.0 as usize][step.1 as usize] = true;
+        });
     }
 
     wall_options.len()
 }
 
 fn can_exit(mut guard: (i32, i32), mut direction: Direction, walls: &Vec<Vec<bool>>) -> bool {
-    let height = walls.len();
-    let width = walls.first().unwrap().len();
-    let mut tracks = vec![vec![false; width]; height];
     let mut visited_stops: HashSet<((i32, i32), Direction)> = HashSet::new();
     loop {
-        let Ok(pos) = next_stop(guard, &direction, &walls, &mut tracks) else {
+        let mut steps_to_obstacle = Vec::new();
+        let Ok(pos) = next_stop(guard, &direction, walls, &mut steps_to_obstacle) else {
             break;
         };
 
