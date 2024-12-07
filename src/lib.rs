@@ -22,3 +22,18 @@ pub fn task_argument(task1: impl Fn(), task2: impl Fn()) {
         None => eprintln!("Provide argument 1 or 2"),
     }
 }
+
+pub fn task_argument_with_input(
+    input_file: &str,
+    task1: impl Fn(String) -> String,
+    task2: impl Fn(String) -> String,
+) -> String {
+    let input = std::fs::read_to_string(input_file).unwrap();
+    let args: Vec<String> = env::args().skip(1).collect();
+    match args.first() {
+        Some(val) if val == "1" => task1(input),
+        Some(val) if val == "2" => task2(input),
+        Some(_) => panic!("Invalid argument. Only 1 or 2 are accepted"),
+        None => panic!("Provide argument 1 or 2"),
+    }
+}
