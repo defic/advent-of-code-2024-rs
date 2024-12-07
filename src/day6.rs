@@ -52,6 +52,7 @@ fn get_steps(
     walls: &Vec<Vec<bool>>,
 ) -> Vec<((i32, i32), Direction)> {
     let mut steps: Vec<((i32, i32), Direction)> = Vec::new();
+    //first pos needs to be included by the spec
     steps.push((start, direction.clone()));
     loop {
         let Ok(pos) = next_stop(start, &direction, &walls, &mut steps, None) else {
