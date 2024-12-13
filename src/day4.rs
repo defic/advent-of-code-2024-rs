@@ -1,4 +1,7 @@
+use std::time::{self, Instant};
+
 use advent_of_code_2024::{get_input, task_argument};
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 
 fn main() {
     task_argument(task1, task2);
@@ -95,31 +98,61 @@ fn get_char_in_coord(coord: (i32, i32), input_lines: &Vec<Vec<char>>) -> Result<
 }
 
 fn task2() {
-    let lines: Vec<String> = std::fs::read_to_string("inputs/input_day4.txt")
-        .unwrap()
-        .lines()
-        .map(|s| s.to_string())
-        .collect();
+    let time = Instant::now();
+    let file = std::fs::read_to_string("inputs/input_day4.txt").unwrap();
+    let lines: Vec<&str> = file.lines().collect();
 
     let res = solve2(lines);
-    println!("res: {}", res);
+    println!("res: {}, in {:?}", res, time.elapsed());
 }
 
-fn solve2(input_lines: Vec<String>) -> i32 {
+fn solve2(input_lines: Vec<&str>) -> usize {
     let input_lines: Vec<_> = input_lines
         .into_iter()
         .map(|string| string.chars().collect::<Vec<char>>())
         .collect();
 
-    let mut total_hits = 0;
-    for (y, line) in input_lines.iter().enumerate() {
-        for (x, char) in line.iter().enumerate() {
-            if *char == 'A' {
-                total_hits += check_mas(y, x, &input_lines);
-            }
-        }
-    }
-    total_hits
+    let res: usize = input_lines
+        .windows(3)
+        .map(|arr| {
+            arr[1]
+                .iter()
+                .enumerate()
+                .skip(1) // not checking leftmost
+                .take(arr[1].len() - 2) // not checking rightmost
+                .filter(|(index, char)| **char == 'A' && is_mas(*index, arr))
+                .count()
+        })
+        .sum();
+    res
+}
+
+fn is_mas(index: usize, arr: &[Vec<char>]) -> bool {
+    let chars = ['S', 'M'];
+    const INDEXES: [(usize, i32); 2] = [(0, -1), (2, 1)];
+    const INDEXES2: [(usize, i32); 2] = [(2, -1), (0, 1)];
+
+    let first = INDEXES
+        .iter()
+        .zip(chars.iter())
+        .all(|((y, x), char)| arr[*y][(index as i32 + *x) as usize] == *char);
+
+    let first_rev = INDEXES
+        .iter()
+        .zip(chars.iter().rev())
+        .all(|((y, x), char)| arr[*y][(index as i32 + *x) as usize] == *char);
+
+    let second = INDEXES2
+        .iter()
+        .zip(chars.iter())
+        .all(|((y, x), char)| arr[*y][(index as i32 + *x) as usize] == *char);
+
+    let second_rev = INDEXES2
+        .iter()
+        .zip(chars.iter().rev())
+        .all(|((y, x), char)| arr[*y][(index as i32 + *x) as usize] == *char);
+
+    (first || first_rev) && (second || second_rev)
 }
 
 fn is_match(
@@ -136,39 +169,6 @@ fn is_match(
         }
     }
     Ok(())
-}
-
-fn check_mas(y: usize, x: usize, input_lines: &Vec<Vec<char>>) -> i32 {
-    //either:
-    let uphill: Vec<(i32, i32)> = vec![(-1, -1), (0, 0), (1, 1)];
-    let mut reverse = uphill.clone();
-    reverse.reverse();
-    let uphill = vec![uphill, reverse];
-
-    let uphill_results: Vec<_> = uphill
-        .into_iter()
-        .map(|d| is_match((y, x), d, input_lines))
-        .collect();
-
-    let uphill_ok = uphill_results.iter().any(|result| result.is_ok());
-
-    //either
-    let downhill: Vec<(i32, i32)> = vec![(-1, 1), (0, 0), (1, -1)];
-    let mut reverse = downhill.clone();
-    reverse.reverse();
-    let downhill = vec![downhill, reverse];
-
-    let downhill_results: Vec<_> = downhill
-        .into_iter()
-        .map(|d| is_match((y, x), d, input_lines))
-        .collect();
-
-    let downhill_ok = downhill_results.iter().any(|result| result.is_ok());
-
-    if uphill_ok && downhill_ok {
-        return 1;
-    }
-    0
 }
 
 #[cfg(test)]
@@ -197,19 +197,19 @@ mod tests {
     #[test]
     fn test_task2() {
         let input = vec![
-            "MMMSXXMASM".to_string(),
-            "MSAMXMSMSA".to_string(),
-            "AMXSXMAAMM".to_string(),
-            "MSAMASMSMX".to_string(),
-            "XMASAMXAMM".to_string(),
-            "XXAMMXXAMA".to_string(),
-            "SMSMSASXSS".to_string(),
-            "SAXAMASAAA".to_string(),
-            "MAMMMXMMMM".to_string(),
-            "MXMXAXMASX".to_string(),
+            "MMMSXXMASM",
+            "MSAMXMSMSA",
+            "AMXSXMAAMM",
+            "MSAMASMSMX",
+            "XMASAMXAMM",
+            "XXAMMXXAMA",
+            "SMSMSASXSS",
+            "SAXAMASAAA",
+            "MAMMMXMMMM",
+            "MXMXAXMASX",
         ];
 
-        let val = solve2(input);
+        let val = solve3(input);
         println!("Res: {}", val)
     }
 }
