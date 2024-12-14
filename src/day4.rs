@@ -209,7 +209,7 @@ mod tests {
             "MXMXAXMASX",
         ];
 
-        let val = solve3(input);
+        let val = solve2(input);
         println!("Res: {}", val)
     }
 }
