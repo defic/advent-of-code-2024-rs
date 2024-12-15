@@ -10,6 +10,7 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
     terminal,
 };
+use rayon::iter;
 
 fn main() {
     let time = Instant::now();
@@ -46,27 +47,94 @@ impl Level {
                 Some(Element::Box) => print!("O"),
                 Some(Element::Wall) => print!("#"),
                 Some(Element::Player) => print!("@"),
+                Some(Element::WideboxA) => print!("["),
+                Some(Element::WideboxB) => print!("]"),
                 None => print!(" "),
             });
             println!();
         });
     }
 
-    fn player_move(&mut self, input: Move) {
+    fn gps_sum(&self) -> usize {
+        self.elements
+            .iter()
+            .enumerate()
+            .map(|(y, line)| {
+                line.iter()
+                    .enumerate()
+                    .filter(|(_, e)| {
+                        matches!(e, Some(Element::Box)) || matches!(e, Some(Element::WideboxA))
+                    })
+                    .map(|x| y * 100 + x.0)
+                    .sum::<usize>()
+            })
+            .sum()
+    }
+
+    fn make_wide(&mut self) {
+        let width = self.elements.first().unwrap().len();
+        let height = self.elements.len();
+        let mut elements = vec![vec![None::<Element>; width * 2]; height];
+
+        self.elements.iter().enumerate().for_each(|(y, line)| {
+            line.iter()
+                .enumerate()
+                .filter_map(|(i, opt)| opt.clone().map(|val| (i, val)))
+                .for_each(|(x, e)| {
+                    let x = x * 2;
+                    match e {
+                        Element::Wall => {
+                            elements[y][x] = Some(Element::Wall);
+                            elements[y][x + 1] = Some(Element::Wall);
+                        }
+                        Element::Box => {
+                            elements[y][x] = Some(Element::WideboxA);
+                            elements[y][x + 1] = Some(Element::WideboxB);
+                        }
+                        Element::Player => {
+                            elements[y][x] = Some(Element::Player);
+                            elements[y][x + 1] = None
+                        }
+                        Element::WideboxA => panic!("Cannot make wide box wider"),
+                        Element::WideboxB => panic!("Cannot make wide box wider"),
+                    }
+                });
+        });
+
+        self.player = Pos(self.player.0, self.player.1 * 2);
+        self.elements = elements;
+    }
+
+    fn player_move(&mut self, input: &Move) {
         let pos = self.player.clone();
-        if self.can_move(pos.clone(), &input) {
+        if self.can_move(pos.clone(), input) {
             let removed = self.elements[pos.0][pos.1].take().unwrap();
-            let new_pos = pos.shift(&input);
+            let new_pos = pos.shift(input);
             self.move_chain(new_pos.clone(), input, removed);
             self.player = new_pos;
         }
     }
 
-    fn move_chain(&mut self, pos: Pos, input: Move, e: Element) {
+    fn move_chain(&mut self, pos: Pos, input: &Move, e: Element) {
         let removed = std::mem::replace(&mut self.elements[pos.0][pos.1], Some(e));
         if let Some(e) = removed {
-            let new_pos = pos.shift(&input);
-            self.move_chain(new_pos, input, e)
+            if *input == Move::Up || *input == Move::Down {
+                match e {
+                    Element::WideboxA => {
+                        let pos_b = Pos(pos.0, pos.1 + 1);
+                        let removed = self.elements[pos_b.0][pos_b.1].take();
+                        self.move_chain(pos_b.shift(input), input, removed.unwrap())
+                    }
+                    Element::WideboxB => {
+                        let pos_a = Pos(pos.0, pos.1 - 1);
+                        let removed = self.elements[pos_a.0][pos_a.1].take();
+
+                        self.move_chain(pos_a.shift(input), input, removed.unwrap())
+                    }
+                    _ => (),
+                }
+            }
+            self.move_chain(pos.shift(input), input, e);
         }
     }
 
@@ -75,6 +143,22 @@ impl Level {
 
         match self.elements[new_pos.0][new_pos.1] {
             Some(Element::Box) => self.can_move(new_pos, input),
+            Some(Element::WideboxA) => {
+                if *input == Move::Up || *input == Move::Down {
+                    self.can_move(new_pos.shift(&Move::Right), input)
+                        && self.can_move(new_pos, input)
+                } else {
+                    self.can_move(new_pos, input)
+                }
+            }
+            Some(Element::WideboxB) => {
+                if *input == Move::Up || *input == Move::Down {
+                    self.can_move(new_pos.shift(&Move::Left), input)
+                        && self.can_move(new_pos, input)
+                } else {
+                    self.can_move(new_pos, input)
+                }
+            }
             Some(Element::Wall) => false,
             Some(Element::Player) => panic!("Who pushes player"),
             None => true,
@@ -112,9 +196,11 @@ enum Element {
     Wall,
     Box,
     Player,
+    WideboxA,
+    WideboxB,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum Move {
     Up,
     Right,
@@ -156,34 +242,29 @@ fn task1(input: String) -> String {
     let (mut level, moves) = parse_input(input);
 
     for m in moves {
+        level.player_move(&m);
         //level.draw();
-        level.player_move(m);
-        //thread::sleep(Duration::from_millis(30));
+        //thread::sleep(Duration::from_millis(1));
     }
-
-    let sum: usize = level
-        .elements
-        .iter()
-        .enumerate()
-        .map(|(y, line)| {
-            line.iter()
-                .enumerate()
-                .filter(|(_, e)| matches!(e, Some(Element::Box)))
-                .map(|x| y * 100 + x.0)
-                .sum::<usize>()
-        })
-        .sum();
-
-    sum.to_string()
+    level.gps_sum().to_string()
 }
 
 fn task2(input: String) -> String {
-    todo!()
+    let (mut level, moves) = parse_input(input);
+    level.make_wide();
+
+    for m in moves {
+        level.player_move(&m);
+        //level.draw();
+        //thread::sleep(Duration::from_millis(1));
+    }
+
+    level.gps_sum().to_string()
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse_input, task1};
+    use crate::{parse_input, task1, task2};
 
     const INPUT1: &str = "##########
 #..O..O.O#
@@ -215,5 +296,11 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
     #[test]
     fn test_task1() {
         task1(INPUT1.to_string());
+    }
+
+    #[test]
+    fn test_task2() {
+        let res = task2(INPUT1.to_string());
+        println!("res: {}", res)
     }
 }
