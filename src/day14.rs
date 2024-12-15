@@ -6,7 +6,6 @@ use std::{
 };
 
 use advent_of_code_2024::task_argument_with_input;
-use rayon::iter::Positions;
 
 fn main() {
     let time = Instant::now();
